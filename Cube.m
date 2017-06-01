@@ -20,7 +20,7 @@ if type==2
 elseif type==3
     [volume] = Volume(P,[],eps,'-walk har -verb 2 -plot');
 else
-    [volume] = Volume(P);
+    [volume] = Volume(P,[],eps);
 end
 
 actual_vol = 2^dim/abs(det(T));

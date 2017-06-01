@@ -36,7 +36,7 @@ function [P] = preprocess( P , options)
 
 
 if nargin<2
-    options = [];
+    options.t = 1;
 end
 
 if ~isfield(options,'toRound')
@@ -52,11 +52,11 @@ end
 dim = size(P.A,2);
 
 %check for width 0 facets to make sure we are full dimensional
-%also check for feasibility
 if options.fullDim==0
     
     fprintf('Checking for width 0 facets...\n');
     
+    eps_cutoff = 1e-7;
     %check if we are doing a metabolic network
     if options.bioModel==1
         %this utilizes that the polytope is a subspace intersected with
@@ -69,45 +69,83 @@ if options.fullDim==0
                 p = parcluster('local');
                 SetWorkerCount(p.NumWorkers);
             end
-            [minFlux, maxFlux] = fastFVA(model,100);
+            [minFlux, maxFlux] = fastFVA(options.model,100);
         else
-            [minFlux, maxFlux] = fluxVariability(model);
+            [minFlux, maxFlux] = fluxVariability(options.model);
         end
-        widths = maxFlux-minFlux;
-        vals = (maxFlux+minFlux)/2;
+%         test = options.model;
+%         test.lb(test.c~=0)=-P.b(end);
+%         test.c = 0*test.c;
+%         [min2,max2] = fluxVariability(test);
+%         test.S = P.A_eq;
+%         test.b = P.b_eq;
+%         test.c = test.c*0;
+% %         [min2,max2] = fluxVariability(test);
+%         norm(minFlux-min2)
+%         norm(maxFlux-max2)
+%         min3 = 0*min2;
+%         max3 = 0*max2;
+%         
+%         for i=1:length(min3)
+%            [min3(i),max3(i)] = getWidth(P,i); 
+%         end
+%         global P
+%         min4 = 0*min3;
+%         max4 = 0*max3;
+%         
+%         for i=1:length(min4)
+%             [min4(i), max4(i)] = getWidth2(P,i);
+%         end
+        
+        tol = 1e-6;
+        optPercentage = 100;
+        optSol = optimizeCbModel(options.model,'max', 0, true);
+        objValue = floor(optSol.f/tol)*tol*optPercentage/100;
+        P.A = [P.A; -options.model.c'];
+        P.b = [P.b; -objValue];
+        
+        
+        isEq = (maxFlux - minFlux) < eps_cutoff;
+%         isEq2 = (max2-min2)<eps_cutoff;
+%         isEq3 = (max3-min3)<eps_cutoff;
+        eq_constraints = sparse(sum(isEq),size(P.A_eq,2));
+        eq_constraints(:,isEq) = speye(sum(isEq));
+        
+        fprintf('Found %d degenerate reactions, adding them to the equality subspace.\n', sum(isEq));
+        
+        P.A_eq = [P.A_eq; eq_constraints];
+        P.b_eq = [P.b_eq; minFlux(isEq)];
     else
         %check the width of every facet
         [widths, vals] = getWidths(P);
-    end
-    
-    eps_cutoff = 1e-7;
-    
-    num_eq = sum(abs(widths)<eps_cutoff);
-    
-    fprintf('Found %d width 0 facets, adding them to the equality subspace.\n', num_eq);
-    if num_eq > 0
-        eq_constraints = zeros(num_eq,dim);
-        eq_rhs = zeros(num_eq,1);
-        curr = 1;
-        for i=1:length(widths)
-            if abs(widths(i)) < eps_cutoff
-                %this facet has width 0
-                %we add this constraint to the equality
-                %subspace, with vals(i) defining
-                %the shift of the facet
-                
-                eq_constraints(curr,:) = P.A(i,:);
-                eq_rhs(curr) = vals(i);
-                curr = curr + 1;
+        
+        
+        num_eq = sum(abs(widths)<eps_cutoff);
+        
+        fprintf('Found %d width 0 facets, adding them to the equality subspace.\n', num_eq);
+        if num_eq > 0
+            
+            eq_constraints = zeros(num_eq,dim);
+            eq_rhs = zeros(num_eq,1);
+            curr = 1;
+            for i=1:length(widths)
+                if abs(widths(i)) < eps_cutoff
+                    %this facet has width 0
+                    %we add this constraint to the equality
+                    %subspace, with vals(i) defining
+                    %the shift of the facet
+                    
+                    eq_constraints(curr,:) = P.A(i,:);
+                    eq_rhs(curr) = vals(i);
+                    curr = curr + 1;
+                end
             end
+            
+            P.A_eq = [P.A_eq; eq_constraints];
+            P.b_eq = [P.b_eq; eq_rhs];
         end
-    else
-        eq_constraints = [];
-        eq_rhs = [];
     end
     
-    P.A_eq = [P.A_eq; eq_constraints];
-    P.b_eq = [P.b_eq; eq_rhs];    
 end
 
 
@@ -118,14 +156,15 @@ if isfield(P,'A_eq') && ~isempty(P.A_eq)
         N = getNullSpace(P.A_eq,0);
     else
         %otherwise just use matlab's built-in one
+        warning('Using MATLAB''s null(), results may be inaccurate. Recommend installing LuSOL.\n');
         N = null(P.A_eq);
     end
-    N = N/2;
+    
     %in case we want the volume dilation factor when restricting to the null space, uncomment
     %the below line (e.g. if the product of all the singular values of N = 1, then there is no
     %volume change)
     
-    P.vol_increase = 1/prod(svd(N));
+    P.vol_increase = 1/prod(svd(full(N)));
     
     %find a point in the null space to define the shift
     z = P.A_eq \ P.b_eq;
@@ -134,7 +173,7 @@ if isfield(P,'A_eq') && ~isempty(P.A_eq)
     P.b = P.b - P.A * z;
     P.A = P.A*N;
     dim = size(P.A,2);
-    
+
     fprintf('Now in %d dimensions after restricting\n', dim);
 else
     N_total = eye(dim);
@@ -178,8 +217,11 @@ if options.toRound==1
             %let mve_run use matlab's lp solver to select a starting point
             [~,x0] = mve_presolve_cobra(P.A,P.b,150,1e-6);
         end
-        
-        
+%         Q.A = P.A;
+%         Q.b = P.b;
+%         Q.A_eq = [];
+%         Q.b_eq = [];
+%         w = getWidths(Q);
         [T_shift, Tmve,converged] = mve_run_cobra(P.A,P.b, x0,1e-8);
         
         [P,N_total, p_shift, T] = shiftPolytope(P, N_total, p_shift, T, Tmve, T_shift);
@@ -335,5 +377,52 @@ for i=1:length(widths)
     vals(i) = P.A(i,:)*x;
     
 end
+
+end
+
+function [min_flux,max_flux] = getWidth(P,index)
+[m,n] = size(P.A);
+
+LP.A = [P.A;P.A_eq];
+LP.b = [P.b;P.b_eq];
+LP.csense = [repmat('L',size(P.b)); repmat('E',size(P.b_eq))];
+LP.osense = -1;
+LP.lb = -Inf*ones(n,1);
+LP.ub = -LP.lb;
+LP.c = 0*ones(n,1);
+LP.c(index) = 1;
+
+[soln] = solveCobraLP(LP);
+max_flux = soln.obj;
+LP.osense = 1;
+
+[soln] = solveCobraLP(LP);
+
+min_flux = soln.obj;
+
+end
+
+function [min_flux,max_flux] = getWidth2(P,index)
+[m,n] = size(P.A);
+
+LP.A = [P.A_eq; -P.A(end,:)];
+LP.b = [P.b_eq; -P.b(end)];
+LP.csense = [repmat('E',size(P.b_eq)); repmat('G',1)];
+LP.osense = -1;
+LP.lb = -P.b(n+1:2*n);
+LP.ub = P.b(1:n);
+LP.c = 0*ones(n,1);
+LP.c(index) = 1;
+
+[soln] = solveCobraLP(LP);
+max_flux = soln.obj;
+LP.osense = 1;
+
+[soln] = solveCobraLP(LP);
+
+min_flux = soln.obj;
+
+
+
 
 end
