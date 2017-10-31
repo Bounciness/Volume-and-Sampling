@@ -11,7 +11,7 @@ classdef ConvexBody < handle
         E_p
         
         %also store E_inv so we don't have to compute it everytime
-%         E_inv
+        %         E_inv
         
         %the radius of ball that K contains
         r
@@ -53,10 +53,10 @@ classdef ConvexBody < handle
             if isempty(E)
                 K.E=[];
                 K.E_p=[];
-%                 K.E_inv=[];
+                %                 K.E_inv=[];
             else
                 K.E=E.E;
-%                 K.E_inv=inv(K.E);
+                %                 K.E_inv=inv(K.E);
                 K.E_p=E.v;
             end
             
@@ -72,12 +72,12 @@ classdef ConvexBody < handle
                         error('The ellipsoid and polytope dimensions don''t match.');
                     end
                 end
-                    
+                
                 if isfield(P,'p')==0 || isempty(P.p)
                     K.b = P.b;
                     K.dim = size(K.A,2);
                     if ~in_K(K,zeros(K.dim,1))
-                       error('You did not provide a point inside the convex body.\nWe checked to see if the origin was inside K, but it was not.\nIf your body is a polytope, preprocess.m might help.%s\n', '');
+                        error('You did not provide a point inside the convex body.\nWe checked to see if the origin was inside K, but it was not.\nIf your body is a polytope, preprocess.m might help.%s\n', '');
                     end
                 else
                     %shift so that the point inside is the origin
@@ -88,7 +88,7 @@ classdef ConvexBody < handle
                     end
                     
                     if ~in_K(K,zeros(K.dim,1))
-                       error('Point provided is not in the convex body.\nIf your body is a polytope, preprocess.m might help.\n%s', '');
+                        error('Point provided is not in the convex body.\nIf your body is a polytope, preprocess.m might help.\n%s', '');
                     end
                 end
             end
@@ -97,7 +97,7 @@ classdef ConvexBody < handle
             K.flagmap = parseFlags(flags);
             K.eps = eps;
             K.m = -1;
-         
+            
             if isKey(K.flagmap,'walk')
                 if strcmp(K.flagmap('walk'),'char')==1
                     K.walk_type = 0;
@@ -207,99 +207,99 @@ classdef ConvexBody < handle
         
         %a deterministic round algorithm for a general polytope
         function [T] = round_det(K)
-           %compute the widths in every direction
-           
-           %to suppress the "Optimization terminated" output from linprog
-           options = optimset('Display','none');
-           
-           widths = zeros(size(K.A,1),1);
-           rhs = zeros(size(K.A,1),1);
-           num_degenerate = 0;
-           for i=1:length(widths)
-               [x,max_dist] = linprog(-K.A(i,:), K.A, K.b,[],[],[],[],[],options);
-               [y,min_dist] = linprog(K.A(i,:), K.A, K.b,[],[],[],[],[],options);
-               
-               
-               widths(i) = abs(max_dist+min_dist)/norm(K.A(i,:),2);
-               rhs(i) = K.A(i,:)*x;
-               if widths(i) <=1e-8
-                   %width in this direction is 0, so we live in a lower dimensional space
-                   num_degenerate = num_degenerate + 1;
-               end
-           end
-           
-           done = 0;
-           rounds_without_progress = 0;
-           prev_max_over_min = 1e300;
-           num_facets = size(K.A,1);
-           T = eye(K.dim, K.dim);
-           small_tol = 1e-2;
-           cos_angles = zeros(length(widths),1);
-                   
-           while ~done
-               
-               max_over_min = max(widths)/min(widths);
-               
-               %check if we've made "progress" this round in improving the
-               %max/min width
-               
-               if prev_max_over_min > (1+small_tol)*max_over_min
+            %compute the widths in every direction
+            
+            %to suppress the "Optimization terminated" output from linprog
+            options = optimset('Display','none');
+            
+            widths = zeros(size(K.A,1),1);
+            rhs = zeros(size(K.A,1),1);
+            num_degenerate = 0;
+            for i=1:length(widths)
+                [x,max_dist] = linprog(-K.A(i,:), K.A, K.b,[],[],[],[],[],options);
+                [y,min_dist] = linprog(K.A(i,:), K.A, K.b,[],[],[],[],[],options);
+                
+                
+                widths(i) = abs(max_dist+min_dist)/norm(K.A(i,:),2);
+                rhs(i) = K.A(i,:)*x;
+                if widths(i) <=1e-8
+                    %width in this direction is 0, so we live in a lower dimensional space
+                    num_degenerate = num_degenerate + 1;
+                end
+            end
+            
+            done = 0;
+            rounds_without_progress = 0;
+            prev_max_over_min = 1e300;
+            num_facets = size(K.A,1);
+            T = eye(K.dim, K.dim);
+            small_tol = 1e-2;
+            cos_angles = zeros(length(widths),1);
+            
+            while ~done
+                
+                max_over_min = max(widths)/min(widths);
+                
+                %check if we've made "progress" this round in improving the
+                %max/min width
+                
+                if prev_max_over_min > (1+small_tol)*max_over_min
                     %we say we've made progress when we've improved by 1%
-                   prev_max_over_min = max_over_min;
+                    prev_max_over_min = max_over_min;
                     rounds_without_progress = 0;
-               else
+                else
                     rounds_without_progress = rounds_without_progress + 1;
                 end
-               
-               if max_over_min <= 2 || rounds_without_progress >= num_facets
-                    %we've gone num_facets without progress, so we're 
+                
+                if max_over_min <= 2 || rounds_without_progress >= num_facets
+                    %we've gone num_facets without progress, so we're
                     %about as round as we're going to get
                     done = 1;
-               else
-                   %scale up along the shortest width
-                   [~, min_index] = min(widths);
-                   
-                   %compute the angles of the facet we are scaling with the
-                   %angles of the other facets (we store cos(theta) since
-                   %that's all we need)
-                   for i=1:length(widths)
-                      cos_angles(i) = dot(K.A(i,:),K.A(min_index,:))/norm(K.A(i,:),2)/norm(K.A(min_index,:),2);
-                   end
-                   
-                   %round the polytope
-                   a = K.A(min_index,:);
-                   
-                   %rescale a to be a unit vector
-                   a = a/norm(a);
-                   round_mat = (eye(K.dim,K.dim) - a' * a / (1 + a*a'));
-                   K.A = K.A * round_mat;
-                   T = T*round_mat;
-                   
-                   %update the widths by the appropriate scaling so we don't 
-                   %have to resolve all the LP's
-                   for i=1:length(widths)
-                       widths(i) = widths(i)*(1+abs(cos_angles(i))^3);
-                   end
-               end
-           end
-           
-           x = zeros(K.dim,1);
-           its = 0;
-            for i=1:10
-               [y]=linprog(randn(K.dim,1),K.A, K.b,[],[],[],[],[],options);
-               its = its+1;
-               x = ((its-1)*x+y)/its;
+                else
+                    %scale up along the shortest width
+                    [~, min_index] = min(widths);
+                    
+                    %compute the angles of the facet we are scaling with the
+                    %angles of the other facets (we store cos(theta) since
+                    %that's all we need)
+                    for i=1:length(widths)
+                        cos_angles(i) = dot(K.A(i,:),K.A(min_index,:))/norm(K.A(i,:),2)/norm(K.A(min_index,:),2);
+                    end
+                    
+                    %round the polytope
+                    a = K.A(min_index,:);
+                    
+                    %rescale a to be a unit vector
+                    a = a/norm(a);
+                    round_mat = (eye(K.dim,K.dim) - a' * a / (1 + a*a'));
+                    K.A = K.A * round_mat;
+                    T = T*round_mat;
+                    
+                    %update the widths by the appropriate scaling so we don't
+                    %have to resolve all the LP's
+                    for i=1:length(widths)
+                        widths(i) = widths(i)*(1+abs(cos_angles(i))^3);
+                    end
+                end
             end
-           K.b = K.b+1e-3;
-           
-           avg = zeros(K.dim,1);
-           
-          
-           for i=1:8*K.dim^3
-               x = hitAndRun(K,x,0);
-               avg = avg+x;
-           end
-           K.p = avg/8/K.dim^3;
+            
+            x = zeros(K.dim,1);
+            its = 0;
+            for i=1:10
+                [y]=linprog(randn(K.dim,1),K.A, K.b,[],[],[],[],[],options);
+                its = its+1;
+                x = ((its-1)*x+y)/its;
+            end
+            K.b = K.b+1e-3;
+            
+            avg = zeros(K.dim,1);
+            
+            
+            for i=1:8*K.dim^3
+                x = hitAndRun(K,x,0);
+                avg = avg+x;
+            end
+            K.p = avg/8/K.dim^3;
         end
         
         %a deterministic rounding algorithm for a centrally symmetric polytope
@@ -329,7 +329,7 @@ classdef ConvexBody < handle
                 end
                 
                 if max_over_min <=2 || rounds_without_progress >= num_facets
-                    %we've gone num_facets without progress, so we're 
+                    %we've gone num_facets without progress, so we're
                     %about as round as we're going to get
                     done = 1;
                 else
@@ -401,7 +401,7 @@ classdef ConvexBody < handle
                             [s,V,x]=round_body(K,x,num_rounding_steps,0);
                             max_s = max(s);
                         else
-                           last_round_under_p = 1; 
+                            last_round_under_p = 1;
                         end
                     else
                         last_round_under_p = 0;
@@ -423,7 +423,7 @@ classdef ConvexBody < handle
                     end
                     %                     det_round=det_round*abs(det(round_mat));
                     round_it=round_it+1;
-%                     prev_det = abs(det(round_mat));
+                    %                     prev_det = abs(det(round_mat));
                     prev_max_s = max_s;
                     
                     %apply the rounding to our points and to the body
@@ -441,7 +441,7 @@ classdef ConvexBody < handle
                         K.E=round_mat'*K.E*round_mat;
                         K.E_p = r_inv * K.E_p;
                         for j=1:num_threads
-                           K.slacks_E(j) = (x(:,j)-K.E_p)'*K.E*(x(:,j)-K.E_p); 
+                            K.slacks_E(j) = (x(:,j)-K.E_p)'*K.E*(x(:,j)-K.E_p);
                         end
                     end
                     
@@ -465,7 +465,7 @@ classdef ConvexBody < handle
                     K.A=old_A;
                     K.b=old_b;
                     K.E=old_E;
-%                     K.E_inv=old_E_inv;
+                    %                     K.E_inv=old_E_inv;
                 end
             end
             if K.verb>=1
@@ -484,7 +484,7 @@ classdef ConvexBody < handle
             
             for i=1:its
                 if ~in_K(K,x(:,th_num))
-                   error('Found a point not in K.'); 
+                    error('Found a point not in K.');
                 end
                 
                 x(:,th_num) = getNextPoint(K,x(:,th_num),a,th_num);
@@ -508,7 +508,7 @@ classdef ConvexBody < handle
             end
             
             if ~isempty(K.E)
-               K.E_p = K.E_p - M; 
+                K.E_p = K.E_p - M;
             end
             
             s = svd(svd_pts);
@@ -521,7 +521,7 @@ classdef ConvexBody < handle
                 end
                 
                 [~,~,V] = svd(svd_pts,0);
-%                 V = eye(K.dim);
+                %                 V = eye(K.dim);
             else
                 s=0*s+1;
                 V=eye(K.dim);
@@ -552,7 +552,7 @@ classdef ConvexBody < handle
                 u(coord)=1;
                 [lambda_test] = dists_to_ellipsoid(K,x,u);
                 if abs(lambda(1)-lambda_test(1))>1e-7 || abs(lambda(2)-lambda_test(2))>1e-7
-                   fprintf('error\n'); 
+                    fprintf('error\n');
                 end
                 lower = max(lower, lambda(1));
                 upper = min(upper, lambda(2));
@@ -631,9 +631,9 @@ classdef ConvexBody < handle
             disc = sqrt(bb^2-4*a*c);
             
             if length(bb)>1 || length(a)>1 || length(c)>1
-               fprintf('hi\n'); 
+                fprintf('hi\n');
             end
-
+            
             lambda = zeros(2,1);
             lambda(1) = min((-bb-disc)/(2*a), (-bb+disc)/(2*a));
             lambda(2) = max((-bb-disc)/(2*a), (-bb+disc)/(2*a));
@@ -743,14 +743,14 @@ classdef ConvexBody < handle
         
         %generate the next point from x \in K according to some pre-defined random walk
         function [x] = getNextPoint(K,x,a,th_num)
-            if K.walk_type == 0  
-               x = coordHitAndRun(K,x,a,th_num);   
+            if K.walk_type == 0
+                x = coordHitAndRun(K,x,a,th_num);
             elseif K.walk_type == 1
-               x = hitAndRun(K,x,a);
+                x = hitAndRun(K,x,a);
             else
                 delta = 4*K.r/sqrt(max(1,a)*K.dim);
                 x = ballWalk(K,x,a,delta);
-            end            
+            end
         end
         
         %this will compute the annealing schedule to the target
@@ -831,22 +831,53 @@ classdef ConvexBody < handle
         %for every thread i
         function [] = resetSlacks(K,x)
             num_threads = size(x,2);
-           if ~isempty(K.A)
-           if isempty(K.slacks)
-              K.slacks = zeros(length(K.b),num_threads); 
-           end
+            if ~isempty(K.A)
+                if isempty(K.slacks)
+                    K.slacks = zeros(length(K.b),num_threads);
+                end
+                
+                for i=1:num_threads
+                    K.slacks(:,i) = K.b - K.A*x(:,i);
+                end
+            end
             
-           for i=1:num_threads
-               K.slacks(:,i) = K.b - K.A*x(:,i); 
-           end
-           end 
-           
-           if ~isempty(K.E)
-              for i=1:num_threads
-                 K.slacks_E(i) = (x(:,i)-K.E_p)'*K.E*(x(:,i)-K.E_p); 
-              end
-           end
+            if ~isempty(K.E)
+                for i=1:num_threads
+                    K.slacks_E(i) = (x(:,i)-K.E_p)'*K.E*(x(:,i)-K.E_p);
+                end
+            end
         end
+        
+        %if we're sampling from a multivariate Gaussian
+        %we assume the Gaussian has mean 0, and sigma is a vector of
+        %variances (here we assume that the covariance matrix is diagonal)
+        function [x,coord,lower,upper] = getNextPoint_MVnormal(K,x,sigma,th_num)
+            
+            
+            if K.walk_type == 0
+                coord = randi(K.dim,1,1);
+                [upper,lower] = get_boundary_pts_char(K,x,coord,th_num);
+                old_x = x;
+                
+%                 if length(sigma)==1
+%                     x(coord) = rand()*(upper-lower)+lower;
+%                 else
+                    
+                    %generate a random point along this chord
+                    a = 1/(2*sigma(coord));
+                    x(coord) = rand_exp_range_coord(lower,upper,a);
+                    if x(coord)>upper || x(coord)<lower
+                        fprintf('uh-oh\n');
+                    end
+%                 end
+                if ~isempty(K.A)
+                    K.slacks(:,th_num) = K.slacks(:,th_num) + K.A(:,coord).*(old_x(coord) - x(coord));
+                end
+            else
+                error('walk_type not yet implemented for multivariate normal walk.\n');
+            end
+        end
+        
         
     end
     

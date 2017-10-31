@@ -19,6 +19,11 @@ if l > 3*sigma || u < -3*sigma
 
             while 1
                new_pt = exprnd(mu) + l;
+               
+%                l
+%                u
+%                sigma
+%                cutoff = exp(-new_pt^2/(2*sigma^2) + new_pt/mu)
                if new_pt <= u && rand() <= exp(-new_pt^2/(2*sigma^2) + new_pt/mu)
                    break;
                end
