@@ -878,6 +878,34 @@ classdef ConvexBody < handle
             end
         end
         
+        %here we sample according to target distribution exp(-<lambda,x>)
+        function [x,coord,lower,upper] = getNextPoint_Exp(K,x,lambda,th_num)
+            
+            
+            if K.walk_type == 0
+                coord = randi(K.dim,1,1);
+                [upper,lower] = get_boundary_pts_char(K,x,coord,th_num);
+                old_x = x;
+                
+%                 if length(sigma)==1
+%                     x(coord) = rand()*(upper-lower)+lower;
+%                 else
+                    
+                    %generate a random point along this chord
+                    a = lambda(coord);
+                    x(coord) = rand_exponential_range_coord(lower,upper,a);
+                    if x(coord)>upper || x(coord)<lower
+                        fprintf('uh-oh\n');
+                    end
+%                 end
+                if ~isempty(K.A)
+                    K.slacks(:,th_num) = K.slacks(:,th_num) + K.A(:,coord).*(old_x(coord) - x(coord));
+                end
+            else
+                error('walk_type not yet implemented for exponential walk.\n');
+            end
+        end
+        
         
     end
     

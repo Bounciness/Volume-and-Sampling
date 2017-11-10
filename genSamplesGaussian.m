@@ -100,21 +100,21 @@ P.p = -new_mu;
 %find the point in our convex body that has the highest Gaussian density
 %this should be a reasonable starting point for a random walk
 K = ConvexBody(P,[],.2,'');
-% QPproblem.A = P.A;
-% QPproblem.b = P.b;
-% QPproblem.csense = 'L';
-% QPproblem.osense = 1;
-% dim = size(P.A,2);
-% QPproblem.lb = -Inf*ones(dim,1);
-% QPproblem.ub = Inf*ones(dim,1);
-% QPproblem.c = zeros(dim,1);
-% QPproblem.F = diag(1./diag(rounded_sigma));
-% solution = solveCobraQP(QPproblem);
+QPproblem.A = P.A;
+QPproblem.b = P.b;
+QPproblem.csense = 'L';
+QPproblem.osense = 1;
+dim = size(P.A,2);
+QPproblem.lb = -Inf*ones(dim,1);
+QPproblem.ub = Inf*ones(dim,1);
+QPproblem.c = zeros(dim,1);
+QPproblem.F = diag(1./diag(rounded_sigma));
+solution = solveCobraQP(QPproblem);
 
 % x = solution.full;
 
-% x = (dim-1)/dim * solution.full + 1/dim * P.p; %give a little padding to make the current point strictly inside the polytope
-x = P.p;
+x = (dim-1)/dim * solution.full + 1/dim * P.p; %give a little padding to make the current point strictly inside the polytope
+% x = P.p;
 resetSlacks(K,x);
 points = zeros(size(P.N,1),numSamples);
 
@@ -125,26 +125,19 @@ for i=1:warmup
 end
 
 for i=1:numSamples
-    if mod(i,round(i/20))==0
+    if mod(i,round(numSamples/20))==0
         fprintf('%d/%d\n', i, numSamples);
     end
-%     i
     for j=1:numSteps
-%         j
-        old_x = x;
-        [x,c,l,u] = getNextPoint_MVnormal(K,x,sigma_v,1);
-%         [x] = getNextPoint(K,x,0,1);
+        [x] = getNextPoint_MVnormal(K,x,sigma_v,1);
     end
     
     %make sure P.A*x <= P.b
-    if min(P.A*x<=P.b)==0
-        fprintf('uh-oh\n');
-    end
-    
-    points(:,i) = P.N*x+P.p_shift;
-%     if min(points(:,i)<=model.ub)==0
+%     if min(P.A*x<=P.b)==0
 %         fprintf('uh-oh\n');
 %     end
+    
+    points(:,i) = P.N*x+P.p_shift;
 end
 
 end

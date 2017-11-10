@@ -69,8 +69,10 @@ if options.fullDim==0
                 p = parcluster('local');
                 SetWorkerCount(p.NumWorkers);
             end
+            fprintf('Doing fast FVA.\n');
             [minFlux, maxFlux] = fastFVA(options.model,100);
         else
+            fprintf('Doing resular FVA.\n');
             [minFlux, maxFlux] = fluxVariability(options.model);
         end
 
@@ -327,6 +329,14 @@ end
 
 function [widths, vals] = getWidths(P)
 
+if exist('solveCobraLP','file')==2
+    error('implement this');
+else
+
+if size(P.A,2)>100
+    warning('MATLAB LP solver will not work well for dimension >~100. Recommend installing COBRA Toolbox with gurobi or CPLEX.');
+end
+
 options = optimset('Display','none');
 warning('off');
 
@@ -349,5 +359,5 @@ for i=1:length(widths)
     vals(i) = P.A(i,:)*x;
     
 end
-
+end
 end

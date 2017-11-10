@@ -1,7 +1,8 @@
 function [ mu, sigma ] = getMuSigma(model, rP, centroid)
 %GETMUSIGMA This function takes in a metabolic network model, and gives a
-%"reasonable" mean and covariance for a Gaussian distribution over the
-%polytope.
+%mean and covariance for a Gaussian distribution over the
+%polytope. The mean and covariance are probably not the best choice, but
+%this could be viewed as a first guess.
 %Input:
 
 % model: the metabolic model
@@ -29,7 +30,7 @@ sigma_diag = zeros(numRxns,1);
 %build the diagonal of sigma, then convert it to a sparse matrix
 for i=1:numRxns
    if model_exch(i)==1
-       sigma_diag(i) = ((model.ub(i)-model.lb(i))/20)^2;
+       sigma_diag(i) = ((model.ub(i)-model.lb(i))/400)^2;
    else
        %if not an exchange reaction, set it to something big
        %note: doing uniform sampling is equivalent to Gaussian

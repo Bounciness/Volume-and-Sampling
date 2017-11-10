@@ -16,7 +16,7 @@ end
 
 dim = size(P.A,2);
 num_samples = round(dim/eps^2);
-num_steps = 8*dim+10;
+num_steps = dim+10;
 
 points = genSamples(P,num_steps, num_samples);
 
