@@ -67,7 +67,7 @@ if options.fullDim==0
             PCT='Parallel Computing Toolbox';
             if  any(strcmp(PCT,{v.Name}))
                 p = parcluster('local');
-                SetWorkerCount(p.NumWorkers);
+                setWorkerCount(p.NumWorkers);
             end
             fprintf('Doing fast FVA.\n');
             [minFlux, maxFlux] = fastFVA(options.model,100);
