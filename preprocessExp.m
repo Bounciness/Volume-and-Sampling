@@ -68,12 +68,12 @@ if options.fullDim==0
         %a box
         if exist('fastFVA')==2
             %check if we can do parallel for fastFVA
-            v=ver;
-            PCT='Parallel Computing Toolbox';
-            if  any(strcmp(PCT,{v.Name}))
-                p = parcluster('local');
-                SetWorkerCount(p.NumWorkers);
-            end
+%             v=ver;
+%             PCT='Parallel Computing Toolbox';
+%             if  any(strcmp(PCT,{v.Name}))
+%                 p = parcluster('local');
+%                 SetWorkerCount(p.NumWorkers);
+%             end
             [minFlux, maxFlux] = fastFVA(options.model,100);
         else
             [minFlux, maxFlux] = fluxVariability(options.model);
