@@ -61,29 +61,33 @@ if options.fullDim==0
     if options.bioModel==1
         %this utilizes that the polytope is a subspace intersected with
         %a box
-        if exist('fastFVA')==2
-            %check if we can do parallel for fastFVA
+        
+        global SOLVERS
+        
+        if options.useFastFVA && SOLVERS.ibm_cplex.installed
+            % check if we can do parallel for fastFVA
             v=ver;
             PCT='Parallel Computing Toolbox';
             if  any(strcmp(PCT,{v.Name}))
                 p = parcluster('local');
                 setWorkerCount(p.NumWorkers);
             end
-            fprintf('Doing fast FVA.\n');
             [minFlux, maxFlux] = fastFVA(options.model,100);
+        elseif options.useFastFVA && ~SOLVERS.ibm_cplex.installed
+            fprintf('IBM CPLEX is not installed, so `fastFVA` cannot be run. Using `fluxVariability` instead\n');
+            [minFlux, maxFlux] = fluxVariability(options.model);
         else
-            fprintf('Doing resular FVA.\n');
             [minFlux, maxFlux] = fluxVariability(options.model);
         end
-
-        
+     
         tol = 1e-6;
         optPercentage = 100;
         optSol = optimizeCbModel(options.model,'max', 0, true);
         objValue = floor(optSol.f/tol)*tol*optPercentage/100;
         P.A = [P.A; -options.model.c'];
         P.b = [P.b; -objValue];
-        
+        P.minFlux = minFlux;
+        P.maxFlux = maxFlux;
         
         isEq = (maxFlux - minFlux) < eps_cutoff;
         eq_constraints = sparse(sum(isEq),size(P.A_eq,2));
@@ -138,8 +142,8 @@ if isfield(P,'A_eq') && ~isempty(P.A_eq)
         N = null(P.A_eq);
     end
     
-    %in case we want the volume dilation factor when restricting to the null space, uncomment
-    %the below line (e.g. if the product of all the singular values of N = 1, then there is no
+    %in case we want the volume dilation factor when restricting to the null space.
+    %(e.g. if the product of all the singular values of N = 1, then there is no
     %volume change)
     
     P.vol_increase = 1/prod(svd(full(N)));
@@ -187,7 +191,7 @@ fprintf('Rounding...\n');
 if options.toRound==1
     
     T = eye(dim);
-    if dim<200
+    if dim<20
         %we can just solve the interior point method once
         if exist('solveCobraLP')==2
             [x0,dist] = getCCcenter(P.A,P.b);
