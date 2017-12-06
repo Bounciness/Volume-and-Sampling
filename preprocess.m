@@ -87,8 +87,6 @@ if options.fullDim==0
         objValue = floor(optSol.f/tol)*tol*optPercentage/100;
         P.A = [P.A; -options.model.c'];
         P.b = [P.b; -objValue];
-        P.minFlux = minFlux;
-        P.maxFlux = maxFlux;
         
         isEq = (maxFlux - minFlux) < eps_cutoff;
         eq_constraints = sparse(sum(isEq),size(P.A_eq,2));
