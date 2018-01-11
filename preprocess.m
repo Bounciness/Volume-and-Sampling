@@ -61,16 +61,16 @@ dim = size(P.A,2);
 
 %check for width 0 facets to make sure we are full dimensional
 if options.fullDim==0
-    
+
     fprintf('Checking for width 0 facets...\n');
-    
+
     %check if we are doing a metabolic network
     if options.bioModel==1
         %this utilizes that the polytope is a subspace intersected with
         %a box
-        
+
         global SOLVERS CBT_LP_PARAMS
-        
+
         if exist('CBT_LP_PARAMS', 'var')
             if isfield(CBT_LP_PARAMS, 'objTol')
                 tol = CBT_LP_PARAMS.objTol;
@@ -87,43 +87,43 @@ if options.fullDim==0
                 setWorkerCount(p.NumWorkers);
             end
             [minFlux, maxFlux] = fastFVA(options.model,options.optPercentage, [], [], [], [], [], [], [], 0);
-            
+
         elseif options.useFastFVA && ~SOLVERS.ibm_cplex.installed
             fprintf('IBM CPLEX is not installed, so `fastFVA` cannot be run. Using `fluxVariability` instead\n');
             [minFlux, maxFlux] = fluxVariability(options.model,options.optPercentage);
-            
-            
+
+
         else
             [minFlux, maxFlux] = fluxVariability(options.model,options.optPercentage);
         end
-        
+
         optSol = optimizeCbModel(options.model,'max', 0, true);
         objValue = floor(optSol.f/tol)*tol*options.optPercentage/100;
-        
+
         P.A = [P.A; -options.model.c'];
         P.b = [P.b; -objValue];
         isEq = (maxFlux - minFlux) < tol;
         eq_constraints = sparse(sum(isEq),size(P.A_eq,2));
         eq_constraints(:,isEq) = speye(sum(isEq));
-               
+
         fprintf('Found %d degenerate reactions, adding them to the equality subspace.\n', sum(isEq));
-       
+
         P.A_eq = [P.A_eq; eq_constraints];
         P.b_eq = [P.b_eq; minFlux(isEq)];
-        
+
         % return minFlux and maxFlux vectors
         P.minFlux = minFlux;
         P.maxFlux = maxFlux;
     else
         %check the width of every facet
         [widths, vals] = getWidths(P);
-        
+
         eps_cutoff = 1e-7;
         num_eq = sum(abs(widths)<eps_cutoff);
-        
+
         fprintf('Found %d width 0 facets, adding them to the equality subspace.\n', num_eq);
         if num_eq > 0
-            
+
             eq_constraints = zeros(num_eq,dim);
             eq_rhs = zeros(num_eq,1);
             curr = 1;
@@ -133,18 +133,18 @@ if options.fullDim==0
                     %we add this constraint to the equality
                     %subspace, with vals(i) defining
                     %the shift of the facet
-                    
+
                     eq_constraints(curr,:) = P.A(i,:);
                     eq_rhs(curr) = vals(i);
                     curr = curr + 1;
                 end
             end
-            
+
             P.A_eq = [P.A_eq; eq_constraints];
             P.b_eq = [P.b_eq; eq_rhs];
         end
     end
-    
+
 end
 
 
@@ -158,13 +158,13 @@ if isfield(P,'A_eq') && ~isempty(P.A_eq)
         warning('Using MATLAB''s null(), results may be inaccurate. Recommend installing LuSOL.\n');
         N = null(P.A_eq);
     end
-    
+
     %in case we want the volume dilation factor when restricting to the null space.
     %(e.g. if the product of all the singular values of N = 1, then there is no
     %volume change)
-    
+
     P.vol_increase = 1/prod(svd(full(N)));
-    
+
     %find a point in the null space to define the shift
     z = P.A_eq \ P.b_eq;
     N_total = N;
@@ -172,7 +172,7 @@ if isfield(P,'A_eq') && ~isempty(P.A_eq)
     P.b = P.b - P.A * z;
     P.A = P.A*N;
     dim = size(P.A,2);
-    
+
     fprintf('Now in %d dimensions after restricting\n', dim);
 else
     N_total = eye(dim);
@@ -206,7 +206,7 @@ P.b = diag(1./row_norms)*P.b;
 fprintf('Rounding...\n');
 
 if options.toRound==1
-    
+
     T = eye(dim);
     if dim<200
         %we can just solve the interior point method once
@@ -216,9 +216,9 @@ if options.toRound==1
             %let mve_run use matlab's lp solver to select a starting point
             [~,x0] = mve_presolve_cobra(P.A,P.b,150,1e-6);
         end
-        
+
         [T_shift, Tmve,converged] = mve_run_cobra(P.A,P.b, x0,1e-8);
-        
+
         [P,N_total, p_shift, T] = shiftPolytope(P, N_total, p_shift, T, Tmve, T_shift);
         if converged~=1
             fprintf('There was a problem with finding the maximum volume ellipsoid.\n');
@@ -245,7 +245,7 @@ if options.toRound==1
                 %let mve_run use matlab's lp solver to select a starting point
                 [~,x0] = mve_presolve_cobra(P.A,P.b,150,1e-6);
             end
-            
+
             reg = max(reg/10,1e-10);
             [T_shift, Tmve,converged] = mve_run_cobra(P.A,P.b, x0,reg);
             [P,N_total, p_shift, T] = shiftPolytope(P, N_total, p_shift, T, Tmve, T_shift);
@@ -255,16 +255,16 @@ if options.toRound==1
             if its==max_its
                 break;
             end
-            
+
             fprintf('Iteration %d: reg=%.1e, ellipsoid vol=%.1e, longest axis=%.1e, shortest axis=%.1e, x0 dist to bdry=%.1e, time=%.1e seconds\n', its, reg, det(Tmve), max(eig(Tmve)), min(eig(Tmve)), dist, toc);
         end
-        
+
         if its==max_its
             fprintf('Reached the maximum number of iterations, rounding may not be ideal.\n');
         end
     end
-    
-    
+
+
     if min(P.b)<=0
         if exist('solveCobraLP')==2
             [x,~] = getCCcenter(P.A,P.b);
@@ -277,15 +277,15 @@ if options.toRound==1
     else
         fprintf('Maximum volume ellipsoid found, and the origin is inside the transformed polytope.\n');
     end
-    
+
     P.p = zeros(dim,1);
-    
+
 elseif options.toRound==2
     K = ConvexBody(P,[],.1,'');
     T = round(K,5);
     P.p = zeros(dim,1);
 else
-    
+
     if exist('solveCobraLP')==2
         [P.p,~] = getCCcenter(P.A,P.b);
     else
@@ -318,7 +318,7 @@ LP.csense = repmat('L',size(LP.A,1),1);
 solution = solveCobraLP(LP);
 
 %also allow -1 because it might be good enough
-if solution.stat == 1 || solution.stat == -1 
+if solution.stat == 1 || solution.stat == -1
     CC_center = solution.full(1:dim);
     radius = solution.obj;
 else
@@ -356,32 +356,32 @@ function [widths, vals] = getWidths(P)
 if exist('solveCobraLP','file')==2
     error('implement this');
 else
-    
+
     if size(P.A,2)>100
         warning('MATLAB LP solver will not work well for dimension >~100. Recommend installing COBRA Toolbox with gurobi or CPLEX.');
     end
-    
+
     options = optimset('Display','none');
     warning('off');
-    
+
     widths = zeros(size(P.A,1),1);
     vals = zeros(size(P.A,1),1);
-    
+
     fprintf('%d constraints to check.\n', length(widths));
     chunk = ceil(length(widths)/10);
-    
+
     for i=1:length(widths)
         %disp(i)
         [x,max_dist] = linprog(-P.A(i,:), P.A,P.b,P.A_eq,P.b_eq,[],[],[],options);
         [~,min_dist] = linprog(P.A(i,:), P.A,P.b,P.A_eq,P.b_eq,[],[],[],options);
-        
+
         if mod(i,chunk)==0
             fprintf('%d/%d done..\n', i, length(widths));
         end
-        
+
         widths(i) = abs(max_dist+min_dist)/norm(P.A(i,:),2);
         vals(i) = P.A(i,:)*x;
-        
+
     end
 end
 end
