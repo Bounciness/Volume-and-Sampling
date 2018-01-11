@@ -304,15 +304,7 @@ end
 
 %compute the center of the Chebyshev ball in the polytope Ax<=b
 function [CC_center,radius] = getCCcenter(A,b)
-%do a quick rescaling of the LP problem 
 
-max_b_val = 5e5;
-
-big_b = b>max_b_val;
-
-A(big_b,:) = A(big_b,:)./(b(big_b)/max_b_val);
-
-b(big_b) = max_b_val;
 dim = size(A,2);
 a_norms = sqrt(sum(A.^2,2));
 
