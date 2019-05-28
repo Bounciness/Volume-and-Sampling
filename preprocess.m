@@ -187,7 +187,12 @@ P.b = P.b(row_norms>1e-6,:);
 
 %maybe add LP presolve here
 
-fprintf('Removed %d zero rows\n', sum(row_norms>1e-6));
+%Aga: add check if sum(row_norms>1e-6) is sparse
+if issparse(sum(row_norms>1e-6))
+    fprintf('Removed %d zero rows\n', full(sum(row_norms>1e-6)));
+else
+    fprintf('Removed %d zero rows\n', sum(row_norms>1e-6));
+end
 
 %scale the matrix to help with numerical precision
 dim = size(P.A,2);
