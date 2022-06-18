@@ -213,7 +213,7 @@ fprintf('Rounding...\n');
 if options.toRound==1
 
     T = eye(dim);
-    if dim<200
+    if dim<200 && ~options.bioModel
         %we can just solve the interior point method once
         if exist('solveCobraLP')==2
             [x0,dist] = getCCcenter(P.A,P.b);
